@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Pure BB</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Pure BB">
+    <meta name="theme-color" content="#000000">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icon-180.png">
+    <style>
+        html { background: #000; -webkit-text-size-adjust: 100%; }
+        button, .day-card, .week-btn, .cal-day, .list-item, .search-item { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+        input, textarea { font-size: 16px; }
+        :root {
+            /* OLED / Dark Mode Palette */
+            --primary: #3b82f6;
+            --primary-dark: #1d4ed8;
+            --secondary: #0ea5e9;
+            --accent: #10b981;
+            --danger: #ef4444;
+            --recovery: #8b5cf6;
+            
+            --bg: #000000;
+            --surface: #121212;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            
+            --border: #27272a;
+            --input-bg: #18181b;
+            
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.5), 0 2px 4px -2px rgba(0,0,0,0.3);
+            --radius: 12px;
+            --safe-bottom: env(safe-area-inset-bottom);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            overscroll-behavior-y: none;
+        }
+
+        /* --- Header --- */
+        header {
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 16px;
+            padding-top: env(safe-area-inset-top);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 50;
+            height: calc(60px + env(safe-area-inset-top));
+            flex-shrink: 0;
+        }
+
+        .header-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+            text-align: center;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .header-btn {
+            background: transparent;
+            border: none;
+            color: var(--primary);
+            font-size: 1.5rem;
+            padding: 4px 8px;
+            cursor: pointer;
+            width: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.2s;
+        }
+        
+        .header-btn:active { opacity: 0.6; }
+        .header-btn.hidden { visibility: hidden; pointer-events: none; }
+
+        /* --- Views --- */
+        main {
+            flex: 1;
+            overflow-y: auto;
+            position: relative;
+            padding: 16px;
+            scroll-behavior: smooth;
+            padding-bottom: calc(80px + var(--safe-bottom));
+        }
+
+        .view {
+            display: none;
+            max-width: 600px;
+            margin: 0 auto;
+            animation: fadeIn 0.3s ease;
+        }
+        .view.active { display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- Components --- */
+        .card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: var(--radius);
+            border: none;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--accent); color: white; }
+        .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+        .btn-recovery { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; border: 1px solid var(--recovery); }
+        .btn-danger { background: rgba(239, 68, 68, 0.15); color: #fca5a5; } 
+        .btn-ghost { background: transparent; color: var(--text-muted); padding: 8px; width: auto; }
+
+        input::placeholder, textarea::placeholder { font-style: italic !important; opacity: 0.5; color: var(--text-muted); }
+
+        .input-row { display: flex; gap: 8px; margin-bottom: 24px; }
+        .modern-input {
+            flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius);
+            background: var(--input-bg); color: var(--text-main); font-size: 1rem; outline: none;
+        }
+        .modern-input:focus { border-color: var(--primary); background: #000; }
+
+        .list-item {
+            display: flex; justify-content: space-between; align-items: center; padding: 16px;
+            background: var(--surface); border-bottom: 1px solid var(--border); cursor: pointer;
+            transition: background 0.2s;
+        }
+        .list-item:first-child { border-top-left-radius: var(--radius); border-top-right-radius: var(--radius); }
+        .list-item:last-child { border-bottom-left-radius: var(--radius); border-bottom-right-radius: var(--radius); border-bottom: none; }
+        .list-item:active { background: var(--border); }
+        .list-item-title { font-weight: 600; font-size: 1.05rem; }
+
+        .cycle-header {
+            font-weight: 800; font-size: 0.85rem; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 1px;
+            margin-bottom: 8px; margin-top: 16px;
+        }
+        .cycle-header:first-child { margin-top: 0; }
+
+        .week-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+        .week-btn {
+            background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 16px 4px; text-align: center; font-weight: 600; cursor: pointer; position: relative;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2); color: var(--text-muted);
+        }
+        .week-btn.active { border-color: var(--primary); color: var(--primary); background: rgba(59, 130, 246, 0.15); }
+        .week-btn.deload { border-color: var(--recovery); color: var(--recovery); }
+        .week-btn.deload.active { background: rgba(139, 92, 246, 0.15); }
+        .week-status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+        }
+        .status-started { background: #f59e0b; }
+        .status-complete { background: var(--accent); }
+
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-weight: 700; font-size: 1.1rem; }
+        .calendar-nav-btn { background: none; border: none; font-size: 1.2rem; padding: 4px 12px; cursor: pointer; color: var(--primary); }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; text-align: center; margin-bottom: 20px; }
+        .cal-day-name { font-size: 0.75rem; color: var(--text-muted); padding-bottom: 8px; font-weight: 700; text-transform: uppercase; }
+        .cal-day { 
+            aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            border-radius: 50%; cursor: pointer; position: relative; font-size: 0.95rem; font-weight: 500; border: 1px solid transparent;
+        }
+        .cal-day:active { background-color: var(--border); }
+        .cal-day.active { background: var(--primary) !important; color: white !important; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.4); }
+        .cal-day.has-data::after { content: ''; position: absolute; bottom: 4px; width: 4px; height: 4px; background: var(--accent); border-radius: 50%; }
+        .cal-day.active.has-data::after { background: white; }
+        .cal-day.today { border-color: var(--primary); color: var(--primary); font-weight: 700; }
+        .cal-day.empty { pointer-events: none; }
+
+        .day-card {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 18px; margin-bottom: 10px; border-radius: var(--radius);
+            background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            border-left: 6px solid transparent; cursor: pointer; transition: background-color 0.2s;
+        }
+        .day-card.started { border-left-color: #f59e0b; background-color: rgba(245, 158, 11, 0.15); }
+        .day-card.completed { border-left-color: var(--accent); background-color: rgba(16, 185, 129, 0.15); }
+        .day-check { font-weight: 800; color: var(--accent); opacity: 0; transform: scale(0.5); transition: all 0.2s; }
+        .day-card.started .day-check, .day-card.completed .day-check { opacity: 1; transform: scale(1); }
+
+        .exercise-card { position: relative; border-left: 4px solid var(--primary); transition: transform 0.2s, opacity 0.2s; }
+        .exercise-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+        .exercise-title-area { flex: 1; padding-right: 10px; }
+        .exercise-name {
+            font-size: 1.1rem; font-weight: 700; color: var(--text-main); width: 100%; border: none; background: transparent; padding: 0; margin-bottom: 4px; appearance: none; -webkit-appearance: none;
+        }
+        .exercise-meta-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .meta-tag {
+            font-size: 0.75rem; background: var(--border); padding: 4px 8px; border-radius: 6px;
+            color: var(--text-muted); font-weight: 500; cursor: pointer; border: 1px solid transparent;
+        }
+        .exercise-actions { display: flex; gap: 8px; }
+        .icon-btn { background: transparent; border: none; font-size: 1.2rem; color: var(--text-muted); cursor: pointer; padding: 4px; }
+
+        .sets-wrapper { display: flex; flex-direction: column; gap: 8px; }
+        .set-row { display: grid; grid-template-columns: 24px 1fr 1fr 30px; gap: 12px; align-items: center; }
+        .set-num { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-align: center; }
+        .set-input-group { position: relative; }
+        .set-input {
+            width: 100%; padding: 10px; text-align: center; font-size: 1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text-main); font-weight: 600;
+        }
+        .set-input:focus { border-color: var(--primary); background: #000; }
+        .input-suffix { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 0.65rem; color: var(--text-muted); pointer-events: none; }
+        
+        .cardio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .cardio-field label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .delete-set-btn { color: var(--danger); opacity: 0.5; background: none; border: none; font-size: 1.5rem; padding: 0; display: flex; align-items: center; justify-content: center; }
+        .delete-set-btn:active { opacity: 1; }
+
+        .note-area {
+            width: 100%; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 10px; font-family: inherit; font-size: 0.9rem; margin-top: 10px; display: none; color: var(--text-main);
+        }
+        .note-area.visible { display: block; }
+        .has-note-indicator { color: var(--danger); font-size: 0.7rem; vertical-align: top; margin-left: 2px; display:none; }
+        .has-note-indicator.show { display: inline; }
+
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+        .overlay.active { opacity: 1; pointer-events: auto; }
+        .bottom-sheet {
+            background: var(--surface); width: 100%; max-width: 600px; border-top-left-radius: 20px; border-top-right-radius: 20px; padding: 24px; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); max-height: 85vh; display: flex; flex-direction: column; border-top: 1px solid var(--border);
+        }
+        .overlay.active .bottom-sheet { transform: translateY(0); }
+        .sheet-title { font-weight: 700; font-size: 1.2rem; margin-bottom: 20px; text-align: center; }
+        .sheet-content { overflow-y: auto; margin-bottom: 20px; }
+        .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .option-btn { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); font-weight: 600; text-align: center; color: var(--text-main); }
+        
+        .toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px); background: #27272a; color: white; padding: 10px 20px; border-radius: 25px; font-size: 0.9rem; opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); border: 1px solid var(--border);
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        .search-list { list-style: none; padding: 0; margin: 0; }
+        .search-item { padding: 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
+        .search-item:active { background: var(--border); }
+
+        .report-list { list-style: none; padding: 0; margin: 0; }
+        .report-item { margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+        .report-item:last-child { border-bottom: none; }
+        .report-stat { display: inline-block; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 3px 8px; border-radius: 6px; font-size: 0.8rem; margin-right: 4px; margin-top: 4px; font-weight: 500; }
+        .report-stat.gain { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .report-stat.maintain { background: rgba(255, 255, 255, 0.1); color: var(--text-muted); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <button id="backBtn" class="header-btn hidden">←</button>
+    <div id="pageTitle" class="header-title">Pure BB <small style="opacity:0.6; font-size:0.7em">v42.2</small></div>
+    <button id="actionBtn" class="header-btn">⋮</button>
+</header>
+
+<main>
+    <!-- MODE SELECT VIEW -->
+    <div id="view-mode-select" class="view active">
+        <div class="card">
+            <h3 style="margin-top:0; text-align:center;">Select Training Mode</h3>
+            <div style="display:flex; flex-direction:column; gap:12px; margin-top:20px;">
+                <button id="btnModeLifting" class="btn btn-primary">
+                    🏋️ Lifting Program
+                </button>
+                <button id="btnModeCardio" class="btn btn-success">
+                    🏃 Cardio Calendar
+                </button>
+            </div>
+        </div>
+
+        <!-- Data Management Card -->
+        <div class="card" style="margin-top: 24px;">
+            <h3 style="margin-top:0;">Data Backup</h3>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:12px;">
+                Secure your data by saving it to a file. Browser cache clearing will not delete this file.
+            </p>
+            <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                <button id="btnBackup" class="btn btn-outline">⬇ Save to Device</button>
+                <button id="btnRestore" class="btn btn-outline">⬆ Load from Device</button>
+            </div>
+            <!-- Hidden File Input -->
+            <input type="file" id="restoreInput" style="display:none" accept="application/json,.json,text/plain">
+        </div>
+    </div>
+
+    <!-- SCHEDULE VIEW -->
+    <div id="view-schedule" class="view">
+        <div id="scheduleContainer"></div>
+        <div style="text-align:center; margin-top:20px;">
+            <button id="btnExport" class="btn btn-ghost">Export Data (CSV)</button>
+        </div>
+    </div>
+
+    <!-- TRACKER VIEW -->
+    <div id="view-tracker" class="view">
+        <div id="exercisesList"></div>
+        <div id="trackerActions" style="margin-top:24px;">
+            <button id="btnAddExercise" class="btn btn-outline">+ Add Exercise</button>
+            <div style="height:12px"></div>
+            <button id="completeBtn" class="btn btn-success">Complete Workout</button>
+            <div style="height:24px"></div>
+            <button id="clearProgressBtn" class="btn btn-danger">Clear Progress</button>
+        </div>
+    </div>
+</main>
+
+<!-- MODALS -->
+<div id="confirmOverlay" class="overlay" onclick="UI.closeModal('confirmOverlay')">
+    <div class="bottom-sheet" onclick="event.stopPropagation()">
+        <div class="sheet-title" id="confirmTitle">Are you sure?</div>
+        <div style="text-align:center; margin-bottom:20px; color:var(--text-muted);" id="confirmMessage"></div>
+        <div class="option-grid">
+            <button class="btn btn-danger" id="confirmYesBtn">Yes</button>
+            <button class="btn btn-outline" onclick="UI.closeModal('confirmOverlay')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div id="motivationOverlay" class="overlay" onclick="UI.closeModal('motivationOverlay')">
+    <div class="bottom-sheet" onclick="event.stopPropagation()">
+        <div class="sheet-title" id="motivationTitle"></div>
+        <div id="motivationMessage" style="text-align:center; margin-bottom:20px; font-size:1.1rem; color:var(--text-main); line-height:1.5;"></div>
+        <div id="progressContent" style="display:none; max-height:40vh; overflow-y:auto; background:var(--input-bg); padding:12px; border-radius:8px; margin-bottom:15px; border:1px solid var(--border);"></div>
+        <div class="option-grid" id="motivationActions"></div>
+    </div>
+</div>
+
+<div id="menuOverlay" class="overlay" onclick="UI.closeModal('menuOverlay')">
+    <div class="bottom-sheet" onclick="event.stopPropagation()">
+        <div class="sheet-title" id="menuTitle">Options</div>
+        <div class="sheet-content option-grid" id="menuOptions"></div>
+        <button class="btn btn-ghost" onclick="UI.closeModal('menuOverlay')">Cancel</button>
+    </div>
+</div>
+
+<div id="selectorOverlay" class="overlay" onclick="UI.closeModal('selectorOverlay')">
+    <div class="bottom-sheet" style="height: 80vh;" onclick="event.stopPropagation()">
+        <div class="sheet-title">Select Exercise</div>
+        <input type="text" id="exerciseSearch" class="modern-input" placeholder="Search..." oninput="App.filterExercises(this.value)" style="margin-bottom:12px;">
+        <div class="sheet-content" style="flex:1;">
+            <ul id="selectorList" class="search-list"></ul>
+            <button type="button" id="addCustomExerciseBtn" class="btn btn-primary" style="margin-top:12px; display:none;">Use custom</button>
+        </div>
+        <button class="btn btn-ghost" onclick="UI.closeModal('selectorOverlay')">Cancel</button>
+    </div>
+</div>
+
+<div id="valueOverlay" class="overlay" onclick="UI.closeModal('valueOverlay')">
+    <div class="bottom-sheet" onclick="event.stopPropagation()">
+        <div class="sheet-title" id="valueTitle">Edit Value</div>
+        <div class="sheet-content">
+            <div class="option-grid" id="valueGrid"></div>
+            <div style="margin-top:12px; border-top:1px solid var(--border); padding-top:12px;">
+                <input type="text" id="customValueInput" class="modern-input" placeholder="Or type custom...">
+                <button class="btn btn-primary" style="margin-top:8px;" onclick="App.saveCustomValue()">Save Custom</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast">Saved</div>
+
+<script>
+/**
+ * PURE BODYBUILDING TRACKER v42.2
+ * Continuous Timeline Engine with Swap Forward-Propagation
+ */
+
+// --- 1. DATA DEFINITIONS ---
+const DATA = {
+    version: "v40", 
+    storePrefix: "pure_bb_",
+    liftingDays: [
+        { key: "upper1", label: "Upper Body #1" }, { key: "lower1", label: "Lower Body #1" },
+        { key: "upper2", label: "Upper Body #2" }, { key: "lower2", label: "Lower Body #2" },
+        { key: "arms",   label: "Weak Points & Arms" }
+    ],
+    cardioConfig: {
+        "Treadmill": ["Time", "Speed", "Incline"], "Elliptical": ["Time", "Level", "Incline"],
+        "Bike": ["Time", "Level", "RPM"], "Swimming": ["Time", "Laps", "Distance"],
+        "Running (Outdoor)": ["Time", "Distance", "Pace"], "Walking": ["Time", "Distance", "Steps"],
+        "Rowing Machine": ["Time", "Distance", "Strokes"], "Stair Climber": ["Time", "Floors", "Level"],
+        "default": ["Time", "Distance", "Intensity"]
+    },
+    metaSuggestions: {
+        'sets': ["1", "2", "3", "4", "5", "6"],
+        'reps': ["4-6", "6-8", "8-10", "10-12", "12-15", "15-20", "Failure"],
+        'rest': ["0.5-1m", "1-2m", "2-3m", "3-5m"],
+        'rpe':  ["7", "8", "~8-9", "9", "~9-10", "10"]
+    },
+    workouts: {
+        "block1_upper1": [
+            {name: "Cuffed Behind-The-Back Lateral Raise", sets: 3, reps: "10-12", rpe: "~9 / 10", rest: "1-2m", alts: ["Cross-Body Cable Y-Raise", "DB Lateral Raise"]},
+            {name: "Cross-Body Lat Pull-Around", sets: 3, reps: "10-12", rpe: "N/A / 10", rest: "1-2m", alts: ["Half-Kneeling 1-Arm Lat Pulldown", "Neutral Grip Pullup"]},
+            {name: "Low Incline Smith Machine Press", sets: 4, reps: "8-10", rpe: "~8-9 / ~9-10", rest: "1-2m", alts: ["Low Incline Machine Press", "Low Incline DB Press"]},
+            {name: "Chest-Supported Machine Row", sets: 3, reps: "8-10", rpe: "9 / 10", rest: "1-2m", alts: ["Chest-Supported T-Bar Row", "Helms Row"]},
+            {name: "Overhead Cable Triceps Extension (Bar)", sets: 2, reps: "8-10", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Overhead Cable Tri Ext (Rope)", "DB Skull Crusher"]},
+            {name: "Straight-Bar Lat Prayer", sets: 3, reps: "12-15", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Machine Lat Pullover", "DB Lat Pullover"]},
+            {name: "Pec Deck (w/ Integrated Partials)", sets: 3, reps: "12-15", rpe: "~8-9 / 10", rest: "1-2m", alts: ["Bent-Over Cable Pec Flye", "DB Flye"]}
+        ],
+        "block1_lower1": [
+            {name: "Seated Leg Curl", sets: 3, reps: "8-10", rpe: "9 / 10", rest: "1-2m", alts: ["Lying Leg Curl", "Nordic Ham Curl"]},
+            {name: "Machine Hip Adduction", sets: 3, reps: "10-12", rpe: "6 / 10", rest: "1-2m", alts: ["Cable Hip Adduction", "Copenhagen Hip Adduction"]},
+            {name: "Hack Squat (Reverse Pyramid)", sets: 3, reps: "4, 6, 8", rpe: "9 / 9", rest: "1-2m", alts: ["Machine Squat", "Front Squat"]},
+            {name: "Leg Extension", sets: 3, reps: "10-12", rpe: "~9 / 10", rest: "1-2m", alts: ["DB Step-Up", "Reverse Nordic"]},
+            {name: "Leg Press Calf Press", sets: 3, reps: "12-15", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Donkey Calf Raise", "Seated Calf Raise"]}
+        ],
+        "block1_upper2": [
+            {name: "Super-ROM Overhand Cable Row", sets: 3, reps: "10-12", rpe: "9 / 10", rest: "1-2m", alts: ["Overhand Machine Row", "Arm-Out Single-Arm DB Row"]},
+            {name: "Machine Shoulder Press", sets: 3, reps: "10-12", rpe: "N/A / 10", rest: "1-2m", alts: ["Cable Shoulder Press", "Seated DB Press"]},
+            {name: "Assisted Pull-Up", sets: 3, reps: "8-10", rpe: "N/A / 10", rest: "1-2m", alts: ["Lat Pulldown", "Machine Pulldown"]},
+            {name: "Paused Assisted Dip", sets: 3, reps: "8-10", rpe: "~8-9 / 10", rest: "1-2m", alts: ["Decline Machine Chest Press", "Decline Barbell Press"]},
+            {name: "Inverse DB Zottman Curl", sets: 2, reps: "10-12", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Slow-Eccentric DB Curl", "Hammer Curl"]},
+            {name: "Super-ROM DB Lateral Raise", sets: 3, reps: "12-15", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Cable Upright Row", "DB Lateral Raise"]},
+            {name: "Cable Reverse Flye (Mech Dropset)", sets: 3, reps: "5,4,3+", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Reverse Pec Deck", "Bent-Over Reverse DB Flye"]}
+        ],
+        "block1_lower2": [
+            {name: "Lying Leg Curl", sets: 3, reps: "8-10", rpe: "6 / 10", rest: "1-2m", alts: ["Seated Leg Curl", "Nordic Ham Curl"]},
+            {name: "Leg Press", sets: 3, reps: "8", rpe: "~8-9 / ~8-9", rest: "1-2m", alts: ["Belt Squat", "High-Bar Back Squat"]},
+            {name: "Paused Barbell RDL", sets: 2, reps: "8", rpe: "~6-7 / ~7-8", rest: "1-2m", alts: ["Paused DB RDL", "Glute-Ham Raise"]},
+            {name: "Machine Hip Adduction", sets: 3, reps: "10-12", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Cable Hip Adduction", "Copenhagen Hip Adduction"]},
+            {name: "Sissy Squat", sets: 3, reps: "10-12", rpe: "~7-8 / ~7-8", rest: "1-2m", alts: ["Leg Extension", "Goblet Squat"]},
+            {name: "Standing Calf Raise", sets: 3, reps: "10-12", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Leg Press Calf Press", "Donkey Calf Raise"]}
+        ],
+        "block1_arms": [
+            {name: "Weak Point Exercise 1", sets: 3, reps: "8-12", rpe: "9 / ~9-10", rest: "1-2m", alts: []},
+            {name: "Weak Point Exercise 2", sets: 2, reps: "8-12", rpe: "9 / ~9-10", rest: "1-2m", alts: []},
+            {name: "Bayesian Cable Curl", sets: 3, reps: "10-12", rpe: "~9-10 / 10", rest: "1-2m", alts: ["DB Incline Curl", "DB Scott Curl"]},
+            {name: "Seated DB French Press", sets: 3, reps: "10", rpe: "~9-10 / 10", rest: "1-2m", alts: ["EZ-Bar Skull Crusher", "DB Skull Crusher"]},
+            {name: "Bottom-2/3 Preacher Curl", sets: 2, reps: "12-15", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Bottom-2/3 EZ-Bar Curl", "Spider Curl"]},
+            {name: "Cable Triceps Kickback", sets: 2, reps: "12-15", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Bench Dip", "DB Triceps Kickback"]},
+            {name: "Cable Crunch", sets: 3, reps: "10-12", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Machine Crunch", "Plate-Weighted Crunch"]}
+        ],
+        "block2_upper1": [
+            {name: "Cuffed Behind-The-Back Lateral Raise", sets: 3, reps: "10-12", rpe: "~9 / 10", rest: "1-2m", alts: ["Cross-Body Cable Y-Raise", "DB Lateral Raise"]},
+            {name: "Lat-Focused Cable Row", sets: 3, reps: "10-12", rpe: "9 / 10", rest: "1-2m", alts: ["Half-Kneeling 1-Arm Lat Pulldown", "Elbows-In 1-Arm DB Row"]},
+            {name: "Low Incline DB Press", sets: 3, reps: "8-10", rpe: "10 / 10", rest: "1-2m", alts: ["Low Incline Machine Press", "Low Incline Barbell Press"]},
+            {name: "Chest-Supported T-Bar Row + Kelso Shrug", sets: 3, reps: "8-10 + 4-6", rpe: "~9 / 10", rest: "1-2m", alts: ["Machine Chest-Supported Row + Shrug", "Incline DB Row + Shrug"]},
+            {name: "Bent-Over Cable Pec Flye (Integrated Partials)", sets: 3, reps: "12-15", rpe: "~8-9 / 10", rest: "1-2m", alts: ["Pec Deck (Integrated Partials)", "DB Flye (Integrated Partials)"]},
+            {name: "1-Arm Lat Pull-In", sets: 2, reps: "12-15", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Wide-Grip Lat Pulldown", "Wide-Grip Band Assisted Pull-Up"]},
+            {name: "Dual-Cable Triceps Press", sets: 3, reps: "10-12", rpe: "~8-9 / 10", rest: "1-2m", alts: ["Overhead Cable Tri Ext (Bar)", "DB Skull Crusher"]}
+        ],
+        "block2_lower1": [
+            {name: "Seated Leg Curl", sets: 3, reps: "8-10", rpe: "9 / 10", rest: "1-2m", alts: ["Lying Leg Curl", "Nordic Ham Curl"]},
+            {name: "Machine Hip Adduction", sets: 3, reps: "10-12", rpe: "6 / 10", rest: "1-2m", alts: ["Cable Hip Adduction", "Copenhagen Hip Adduction"]},
+            {name: "Smith Machine Squat", sets: 3, reps: "4, 6, 8", rpe: "9 / 9", rest: "1-2m", alts: ["Machine Squat", "DB Bulgarian Split Squat"]},
+            {name: "Leg Extension", sets: 3, reps: "10-12", rpe: "~9 / 10", rest: "1-2m", alts: ["DB Step-Up", "Reverse Nordic"]},
+            {name: "DB Calf Jumps", sets: 3, reps: "12-15", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Leg Press Calf Jumps", "Standing Calf Raise"]}
+        ],
+        "block2_upper2": [
+            {name: "Dual-Handle Lat Pulldown", sets: 3, reps: "10-12", rpe: "9 / 10", rest: "1-2m", alts: ["Overhand Lat Pulldown", "Pull-Up"]},
+            {name: "Seated DB Shoulder Press", sets: 3, reps: "10-12", rpe: "9 / 10", rest: "1-2m", alts: ["Seated Barbell Shoulder Press", "Standing DB Arnold Press"]},
+            {name: "Chest-Supported Machine Row", sets: 3, reps: "8-10", rpe: "9 / 10", rest: "1-2m", alts: ["Chest-Supported T-Bar Row", "Helms Row"]},
+            {name: "Decline Machine Chest Press", sets: 3, reps: "8-10", rpe: "~8-9 / 10", rest: "1-2m", alts: ["Decline Smith Machine Press", "Decline Barbell Press"]},
+            {name: "Concentration Cable Curl", sets: 2, reps: "10-12", rpe: "~9-10 / 10", rest: "1-2m", alts: ["DB Concentration Curl", "DB Preacher Curl"]},
+            {name: "Cross-Body Cable Y-Raise", sets: 3, reps: "10-12", rpe: "9 / 10", rest: "1-2m", alts: ["Machine Lateral Raise", "DB Lateral Raise"]},
+            {name: "Rear Delt 45 Cable Flye", sets: 3, reps: "12-15", rpe: "~9-10 / 10", rest: "1-2m", alts: ["DB Rear Delt Swing", "Bent-Over Reverse DB Flye"]}
+        ],
+        "block2_lower2": [
+            {name: "Lying Leg Curl", sets: 3, reps: "8-10", rpe: "6 / 10", rest: "1-2m", alts: ["Seated Leg Curl", "Nordic Ham Curl"]},
+            {name: "Smith Machine Reverse Lunge", sets: 3, reps: "8", rpe: "~8-9 / ~8-9", rest: "1-2m", alts: ["DB Reverse Lunge", "DB Walking Lunge"]},
+            {name: "Glute-Ham Raise", sets: 3, reps: "8", rpe: "~8-9 / ~9-10", rest: "1-2m", alts: ["Nordic Ham Curl", "Seated Leg Curl"]},
+            {name: "Machine Hip Adduction", sets: 3, reps: "10-12", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Cable Hip Adduction", "Copenhagen Hip Adduction"]},
+            {name: "Machine Hip Abduction", sets: 3, reps: "10-12", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Cable Hip Abduction", "Lateral Band Walk"]},
+            {name: "Standing Calf Raise", sets: 3, reps: "10-12", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Seated Calf Raise", "Leg Press Calf Press"]}
+        ],
+        "block2_arms": [
+            {name: "Weak Point Exercise 1", sets: 3, reps: "8-12", rpe: "9 / ~9-10", rest: "1-2m", alts: ["(See Guide)"]},
+            {name: "Weak Point Exercise 2", sets: 2, reps: "8-12", rpe: "9 / ~9-10", rest: "1-2m", alts: ["(See Guide)"]},
+            {name: "Slow-Eccentric Bayesian Curl", sets: 3, reps: "10-12", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Slow-Eccentric DB Incline Curl", "Slow-Eccentric DB Scott Curl"]},
+            {name: "Slow-Eccentric EZ-Bar Skull Crusher", sets: 3, reps: "10-12", rpe: "9 / ~9-10", rest: "1-2m", alts: ["Slow-Eccentric DB Skull Crusher", "Slow-Eccentric DB French Press"]},
+            {name: "Triceps Diverging Pressdown (Long Rope)", sets: 2, reps: "12-15", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Cable Triceps Kickback", "DB Triceps Kickback"]},
+            {name: "Reverse Grip Cable Curl", sets: 2, reps: "12-15", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Reverse-Grip EZ-Bar Curl", "Reverse-Grip DB Curl"]},
+            {name: "Roman Chair Leg Raise", sets: 3, reps: "10-20", rpe: "~9-10 / 10", rest: "1-2m", alts: ["Hanging Leg Raise", "Reverse Crunch"]}
+        ]
+    }
+};
+
+const esc = (str) => String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const localDateStr = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+const MASTER_LIST = new Set();
+for(let k in DATA.workouts) { 
+    DATA.workouts[k].forEach(ex => { 
+        MASTER_LIST.add(ex.name); 
+        if(ex.alts) ex.alts.forEach(a => MASTER_LIST.add(a)); 
+    }); 
+}
+Object.keys(DATA.cardioConfig).forEach(c => MASTER_LIST.add(c));
+
+// --- 2. STORE (Single Continuous File) ---
+const Store = {
+    state: {
+        profiles: [], // kept to ensure we don't break old loading
+        logs: {},
+        prefs: {},
+        status: {},
+        meta: {},
+        dynamic: {},
+        customExercises: { lifting: [], cardio: [] }
+    },
+    
+    currentProfile: null,
+
+    init() {
+        try {
+            if (navigator.storage && navigator.storage.persist) {
+                navigator.storage.persist().then(granted => console.log("Persist: " + granted));
+            }
+
+            const stored = localStorage.getItem(`${DATA.storePrefix}profiles_${DATA.version}`);
+            this.state.profiles = stored ? JSON.parse(stored) : [];
+            
+            if (this.state.profiles.length === 0) {
+                this.state.profiles.push("Cycle 1");
+                localStorage.setItem(`${DATA.storePrefix}profiles_${DATA.version}`, JSON.stringify(this.state.profiles));
+            }
+
+            // Always load the primary/oldest profile implicitly to keep using existing data keys
+            this.loadProfile(this.state.profiles[0]);
+            
+            const customRaw = localStorage.getItem(`${DATA.storePrefix}custom_exercises_${DATA.version}`);
+            let custom = customRaw ? JSON.parse(customRaw) : {};
+            if (!Array.isArray(custom.lifting)) custom.lifting = [];
+            if (!Array.isArray(custom.cardio)) custom.cardio = [];
+            this.state.customExercises = custom;
+            
+        } catch(e) {
+            console.error("Storage Init Error", e);
+        }
+    },
+
+    loadProfile(name) {
+        this.currentProfile = name;
+        const p = DATA.storePrefix, v = DATA.version;
+        try {
+            this.state.logs = JSON.parse(localStorage.getItem(`${p}logs_${v}_${name}`)) || {};
+            this.state.prefs = JSON.parse(localStorage.getItem(`${p}prefs_${v}_${name}`)) || {};
+            this.state.status = JSON.parse(localStorage.getItem(`${p}status_${v}_${name}`)) || {};
+            this.state.meta = JSON.parse(localStorage.getItem(`${p}meta_${v}_${name}`)) || {};
+            this.state.dynamic = JSON.parse(localStorage.getItem(`${p}dynamic_${v}_${name}`)) || {};
+        } catch (e) {
+            console.error("Profile Load Error", e);
+        }
+    },
+
+    save(type) {
+        const p = DATA.storePrefix, v = DATA.version, n = this.currentProfile;
+        if (!n) return;
+        try { localStorage.setItem(`${p}${type}_${v}_${n}`, JSON.stringify(this.state[type])); }
+        catch (e) { console.error("Save failed", e); UI.toast("Storage full - export a backup"); }
+    },
+
+    // Debounced save: typing in a set box no longer rewrites all logs on every keystroke
+    _pending: {}, _timer: null,
+    queueSave(type) {
+        this._pending[type] = true;
+        clearTimeout(this._timer);
+        this._timer = setTimeout(() => this.flush(), 400);
+    },
+    flush() {
+        clearTimeout(this._timer);
+        Object.keys(this._pending).forEach(t => this.save(t));
+        this._pending = {};
+    },
+    
+    saveCustomExercises() {
+        localStorage.setItem(`${DATA.storePrefix}custom_exercises_${DATA.version}`, JSON.stringify(this.state.customExercises));
+    },
+
+    getLog(key) { return this.state.logs[key] || ""; },
+    setLog(key, val) { this.state.logs[key] = val; this.queueSave("logs"); },
+    
+    isWeekStarted(w) { 
+        return Object.keys(this.state.logs).some(k => k.startsWith(`w${w}_`) && DATA.liftingDays.some(d => k.includes(`_${d.key}_`)));
+    },
+    isDayStarted(w, d) { return Object.keys(this.state.logs).some(k => k.startsWith(`w${w}_${d}`)); }
+};
+
+// --- 3. UI HELPERS ---
+const UI = {
+    el: (id) => document.getElementById(id),
+    create: (tag, className, html = "", events = {}) => {
+        const el = document.createElement(tag);
+        if (className) el.className = className;
+        if (html) el.innerHTML = html;
+        for (let key in events) el.addEventListener(key, events[key]);
+        return el;
+    },
+    showView: (viewId) => {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        UI.el(viewId).classList.add('active');
+        window.scrollTo(0, 0);
+    },
+    openModal: (id) => { const el = UI.el(id); el.classList.add('active'); el.style.display = 'flex'; },
+    closeModal: (id) => {
+        UI.el(id).classList.remove('active');
+        setTimeout(() => { if(!UI.el(id).classList.contains('active')) UI.el(id).style.display = 'none'; }, 300);
+    },
+    toast: (msg) => {
+        const t = UI.el('toast'); t.textContent = msg; t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2000);
+    },
+    showConfirm(msg, onConfirm) {
+        const overlay = UI.el('confirmOverlay');
+        UI.el('confirmMessage').textContent = msg;
+        const btn = UI.el('confirmYesBtn');
+        const newBtn = btn.cloneNode(true); 
+        btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.onclick = () => { onConfirm(); UI.closeModal('confirmOverlay'); };
+        newBtn.textContent = "Yes"; newBtn.className = "btn btn-danger";
+        UI.openModal('confirmOverlay');
+    }
+};
+
+// --- 4. APP CONTROLLER ---
+const App = {
+    context: {
+        week: null, dayKey: null, dayLabel: null, tab: 'lifting', exerciseIndex: null,
+        metaField: null, isAdding: false,
+        calendar: { year: new Date().getFullYear(), month: new Date().getMonth(), selectedDate: localDateStr() }
+    },
+
+    init() {
+        Store.init();
+        
+        const bindBtn = (id, fn) => {
+            const el = document.getElementById(id);
+            if(el) { el.addEventListener('click', (e) => { e.preventDefault(); fn(); }); }
+        };
+
+        bindBtn('backBtn', () => this.goBack());
+        bindBtn('btnBackup', () => this.backupData());
+        bindBtn('btnRestore', () => UI.el('restoreInput').click());
+        
+        const fileInput = document.getElementById('restoreInput');
+        if(fileInput) fileInput.addEventListener('change', (e) => this.handleRestore(e.target));
+        
+        bindBtn('btnModeLifting', () => this.selectMode('lifting'));
+        bindBtn('btnModeCardio', () => this.selectMode('cardio'));
+        bindBtn('btnAddExercise', () => this.openAddExercise());
+        bindBtn('completeBtn', () => this.finishWorkout());
+        bindBtn('clearProgressBtn', () => this.clearProgress());
+        bindBtn('btnExport', () => this.exportData());
+        
+        const sheetContent = document.querySelector('#selectorOverlay .sheet-content');
+        if (sheetContent) {
+            sheetContent.addEventListener('mousedown', (e) => {
+                if (e.target.closest('.search-item') || e.target.closest('#addCustomExerciseBtn')) e.preventDefault(); 
+            });
+            sheetContent.addEventListener('click', (e) => {
+                const li = e.target.closest('.search-item');
+                if (li && li.dataset.name) { e.preventDefault(); this.swapExercise(li.dataset.name); return; }
+                const addBtn = e.target.closest('#addCustomExerciseBtn');
+                if (addBtn) { e.preventDefault(); this.addCustomExercise(); }
+            });
+        }
+
+        // Jump straight to mode select, skipping profiles completely
+        this.loadModeSelect();
+    },
+
+    goBack() {
+        if (UI.el('view-tracker').classList.contains('active')) this.loadSchedule(); 
+        else if (UI.el('view-schedule').classList.contains('active')) this.loadModeSelect(); 
+    },
+
+    setHeader(title, showBack) {
+        UI.el('pageTitle').innerHTML = title;
+        UI.el('backBtn').classList.toggle('hidden', !showBack);
+    },
+
+    backupData() {
+        const backup = { version: DATA.version, timestamp: new Date().toISOString(), store: {} };
+        for(let i=0; i<localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if(key.startsWith(DATA.storePrefix)) backup.store[key] = localStorage.getItem(key);
+        }
+        const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
+        const fname = `pure_bb_backup_${localDateStr()}.json`;
+        const file = new File([blob], fname, { type: 'application/json' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            navigator.share({ files: [file], title: 'Pure BB backup' }).catch(() => {});
+            return;
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = fname;
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+
+    handleRestore(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const json = JSON.parse(e.target.result);
+                UI.showConfirm("Restore from backup? Overwrites current data.", () => {
+                    if (json.store) {
+                        const keysToRemove = [];
+                        for (let i=0; i<localStorage.length; i++) {
+                            const key = localStorage.key(i);
+                            if (key.startsWith(DATA.storePrefix)) keysToRemove.push(key);
+                        }
+                        keysToRemove.forEach(k => localStorage.removeItem(k));
+                        Object.keys(json.store).forEach(k => localStorage.setItem(k, json.store[k]));
+                        UI.toast("Restore Successful. Reloading...");
+                        setTimeout(() => location.reload(), 1000);
+                    }
+                });
+            } catch(err) { UI.toast("Error parsing backup."); }
+        };
+        reader.readAsText(file); input.value = '';
+    },
+
+    loadModeSelect() {
+        UI.showView('view-mode-select');
+        this.setHeader(`Pure BB <small style="opacity:0.6; font-size:0.7em">v42.2</small>`, false);
+    },
+
+    selectMode(mode) {
+        this.context.tab = mode;
+        this.loadSchedule();
+    },
+
+    loadSchedule() {
+        UI.showView('view-schedule');
+        const title = this.context.tab === 'lifting' ? 'Lifting Timeline' : 'Cardio Calendar';
+        this.setHeader(title, true);
+        const container = UI.el('scheduleContainer');
+        container.innerHTML = "";
+        
+        if (this.context.tab === 'lifting') {
+            if (!this.context.week) this.context.week = 1;
+            this.renderWeekGrid(container);
+            
+            const isDeload = Store.state.status[`w${this.context.week}_is_deload`];
+            const toggleContainer = UI.create('div', '', '', {});
+            toggleContainer.style.textAlign = 'center'; toggleContainer.style.marginBottom = '20px';
+            const btn = UI.create('button', `btn btn-outline ${isDeload ? 'btn-recovery' : ''}`, isDeload ? '🧘 Recovery / Deload Active' : 'Set Recovery / Deload Week');
+            btn.onclick = () => this.toggleDeload();
+            toggleContainer.appendChild(btn);
+            container.appendChild(toggleContainer);
+            this.renderLiftingDays(container);
+        } else {
+            this.renderCalendar(container);
+        }
+    },
+
+    toggleDeload() {
+        const k = `w${this.context.week}_is_deload`;
+        if (Store.state.status[k]) delete Store.state.status[k]; else Store.state.status[k] = true;
+        Store.save('status');
+        this.loadSchedule();
+    },
+
+    renderWeekGrid(parent) {
+        let maxCycle = Store.state.prefs.max_cycle || 1;
+        
+        for (let c = 1; c <= maxCycle; c++) {
+            const cycleHeader = UI.create('div', 'cycle-header', `Cycle ${c}`);
+            parent.appendChild(cycleHeader);
+
+            const grid = UI.create('div', 'week-grid');
+            for (let i = 1; i <= 11; i++) {
+                const absW = (c - 1) * 11 + i;
+                const isDeload = Store.state.status[`w${absW}_is_deload`];
+                const btn = UI.create('div', `week-btn ${absW === this.context.week ? 'active' : ''} ${isDeload ? 'deload' : ''}`, `${absW}`);
+                
+                let allDone = true, anyStarted = false;
+                DATA.liftingDays.forEach(d => {
+                    if (Store.state.status[`w${absW}_${d.key}`]) anyStarted = true;
+                    else allDone = false;
+                    if (Store.isDayStarted(absW, d.key)) anyStarted = true;
+                });
+
+                if (allDone && anyStarted) btn.innerHTML += `<div class="week-status-dot status-complete"></div>`;
+                else if (anyStarted) btn.innerHTML += `<div class="week-status-dot status-started"></div>`;
+                
+                btn.onclick = () => { this.context.week = absW; this.loadSchedule(); };
+                grid.appendChild(btn);
+            }
+            parent.appendChild(grid);
+        }
+        
+        const addCycleBtn = UI.create('button', 'btn btn-outline', `+ Start Cycle ${maxCycle + 1}`);
+        addCycleBtn.style.marginTop = '16px';
+        addCycleBtn.onclick = () => {
+            Store.state.prefs.max_cycle = maxCycle + 1;
+            Store.save('prefs');
+            this.loadSchedule();
+            setTimeout(() => {
+                parent.scrollTop = parent.scrollHeight;
+            }, 100);
+        };
+        parent.appendChild(addCycleBtn);
+    },
+
+    renderLiftingDays(parent) {
+        const card = UI.create('div', 'card');
+        const list = UI.create('div', '');
+        DATA.liftingDays.forEach(d => {
+            const isDone = Store.state.status[`w${this.context.week}_${d.key}`];
+            const isStarted = Store.isDayStarted(this.context.week, d.key);
+            let statusClass = isDone ? "completed" : (isStarted ? "started" : "");
+            const item = UI.create('div', `day-card ${statusClass}`, `<span>${d.label}</span><span class="day-check">✓</span>`);
+            item.onclick = () => this.loadTracker(d.key, d.label);
+            list.appendChild(item);
+        });
+        card.appendChild(list);
+        parent.appendChild(card);
+    },
+
+    changeMonth(delta) {
+        let m = this.context.calendar.month + delta, y = this.context.calendar.year;
+        if (m > 11) { m = 0; y++; } else if (m < 0) { m = 11; y--; }
+        this.context.calendar.month = m; this.context.calendar.year = y;
+        this.loadSchedule();
+    },
+
+    renderCalendar(parent) {
+        const { year, month } = this.context.calendar;
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const header = UI.create('div', 'calendar-header', `<button class="calendar-nav-btn" onclick="App.changeMonth(-1)">‹</button><span>${monthNames[month]} ${year}</span><button class="calendar-nav-btn" onclick="App.changeMonth(1)">›</button>`);
+        const card = UI.create('div', 'card'); card.appendChild(header);
+        const grid = UI.create('div', 'calendar-grid');
+        ['S','M','T','W','T','F','S'].forEach(d => grid.appendChild(UI.create('div', 'cal-day-name', d)));
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const todayStr = localDateStr();
+        for(let i=0; i<firstDay; i++) grid.appendChild(UI.create('div', 'cal-day empty'));
+        for(let d=1; d<=daysInMonth; d++) {
+            const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const isActive = dateStr === this.context.calendar.selectedDate;
+            const isToday = dateStr === todayStr;
+            const hasData = Object.keys(Store.state.dynamic).some(k => k === `c_${dateStr}`);
+            const cell = UI.create('div', `cal-day ${isActive ? 'active' : ''} ${isToday ? 'today' : ''} ${hasData ? 'has-data' : ''}`, `${d}`);
+            cell.onclick = () => { this.context.calendar.selectedDate = dateStr; this.loadTracker(dateStr, dateStr); };
+            grid.appendChild(cell);
+        }
+        card.appendChild(grid); parent.appendChild(card);
+    },
+
+    loadTracker(dayKey, dayLabel) {
+        this.context.dayKey = dayKey; this.context.dayLabel = dayLabel;
+        UI.showView('view-tracker');
+        this.setHeader(`${dayLabel}`, true);
+        UI.el('completeBtn').textContent = this.context.tab === 'cardio' ? "Complete Cardio" : "Complete Workout";
+        if (this.context.tab === 'cardio') this.renderCardioExercises(); else this.renderLiftingExercises();
+    },
+
+    getExercises(w, d) {
+        if (this.context.tab === 'cardio') return Store.state.dynamic[`c_${this.context.dayKey}`] || [];
+        
+        const wk = w || this.context.week, dk = d || this.context.dayKey;
+        const dynKey = `w${wk}_${dk}`;
+        if (Store.state.dynamic[dynKey]) return Store.state.dynamic[dynKey];
+
+        // If structure is missing for e.g. W13, pull exactly from W2 (13-11)
+        if (wk > 11) {
+            const prevWk = wk - 11;
+            const prevDynKey = `w${prevWk}_${dk}`;
+            if (Store.state.dynamic[prevDynKey]) {
+                Store.state.dynamic[dynKey] = JSON.parse(JSON.stringify(Store.state.dynamic[prevDynKey]));
+                Store.save('dynamic');
+                return Store.state.dynamic[dynKey];
+            }
+        }
+
+        const templateWk = ((wk - 1) % 11) + 1;
+        const blockPrefix = templateWk >= 7 ? "block2_" : "block1_";
+        return JSON.parse(JSON.stringify(DATA.workouts[blockPrefix + dk] || []));
+    },
+
+    saveExercises(exercises) {
+        const dynKey = this.context.tab === 'cardio' ? `c_${this.context.dayKey}` : `w${this.context.week}_${this.context.dayKey}`;
+        Store.state.dynamic[dynKey] = exercises;
+        Store.save('dynamic');
+    },
+
+    // Simple, clean backwards scan across the continuous timeline
+    findRecentLiftingSession(targetName, currentWeek, currentDayKey) {
+        const dayOrder = DATA.liftingDays.map(d => d.key);
+        const currentDayIndex = dayOrder.indexOf(currentDayKey);
+        const cleanTarget = targetName.trim().toLowerCase();
+        
+        for (let w = currentWeek; w >= 1; w--) {
+            const isDeload = Store.state.status[`w${w}_is_deload`];
+            if (isDeload && w !== currentWeek) continue;
+            
+            let daysToCheck = (w === currentWeek) ? DATA.liftingDays.slice(0, currentDayIndex).reverse() : [...DATA.liftingDays].reverse();
+            
+            for (const dayObj of daysToCheck) {
+                // Peek at exercises for week 'w'
+                let exercises = Store.state.dynamic[`w${w}_${dayObj.key}`];
+                if (!exercises) {
+                    const templateWk = ((w - 1) % 11) + 1;
+                    const defaultBlock = (templateWk >= 7) ? "block2_" : "block1_";
+                    exercises = DATA.workouts[defaultBlock + dayObj.key] || [];
+                }
+                
+                for (let i = 0; i < exercises.length; i++) {
+                    const prefKey = `w${w}_${dayObj.key}_ex${i}_choice`;
+                    const usedName = Store.state.prefs[prefKey] || exercises[i].name;
+                    
+                    if (usedName.trim().toLowerCase() === cleanTarget) {
+                        const safeName = usedName.replace(/[^a-zA-Z0-9]/g, '');
+                        let hasAnyData = false;
+                        for(let s=1; s<=10; s++){
+                            if(Store.getLog(`w${w}_${dayObj.key}_ex${i}_${safeName}_s${s}_w`) || 
+                               Store.getLog(`w${w}_${dayObj.key}_ex${i}_${safeName}_s${s}_r`)) {
+                                hasAnyData = true; break;
+                            }
+                        }
+                        if (hasAnyData) {
+                             return { week: w, day: dayObj.key, index: i, safeName: safeName };
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    },
+
+    findHistory(targetName, currentWeek, currentDayKey, setNum) {
+        const session = this.findRecentLiftingSession(targetName, currentWeek, currentDayKey);
+        if (!session) return null;
+        const rowId = `w${session.week}_${session.day}_ex${session.index}_${session.safeName}_s${setNum}`;
+        const w = Store.getLog(`${rowId}_w`), r = Store.getLog(`${rowId}_r`);
+        if (w || r) return { weight: w, reps: r };
+        return null;
+    },
+
+    findHistoryNote(targetName, currentWeek, currentDayKey) {
+        const session = this.findRecentLiftingSession(targetName, currentWeek, currentDayKey);
+        if (!session) return "";
+        return Store.getLog(`w${session.week}_${session.day}_ex${session.index}_${session.safeName}_note`) || "";
+    },
+    
+    resolveExerciseName(input) {
+        const clean = input.trim(), lower = clean.toLowerCase();
+        for (const ex of MASTER_LIST) { if (ex.toLowerCase() === lower) return ex; }
+        const list = this.context.tab === 'cardio' ? Store.state.customExercises.cardio : Store.state.customExercises.lifting;
+        for (const ex of list) { if (ex.toLowerCase() === lower) return ex; }
+        return clean;
+    },
+
+    renderLiftingExercises() {
+        const container = UI.el('exercisesList'); container.innerHTML = "";
+        const exercises = this.getExercises();
+        const baseId = `w${this.context.week}_${this.context.dayKey}`;
+        
+        exercises.forEach((ex, idx) => {
+            const card = UI.create('div', 'exercise-card card'); card.dataset.index = idx;
+            const prefKey = `${baseId}_ex${idx}_choice`;
+            let selectedName = Store.state.prefs[prefKey];
+            
+            // Carry over preference from exact same week last cycle if undefined
+            if (!selectedName && this.context.week > 11) {
+                const prevPrefKey = `w${this.context.week - 11}_${this.context.dayKey}_ex${idx}_choice`;
+                if (Store.state.prefs[prevPrefKey]) {
+                    selectedName = Store.state.prefs[prevPrefKey];
+                    Store.state.prefs[prefKey] = selectedName;
+                    Store.save('prefs');
+                }
+            }
+            if (!selectedName) selectedName = ex.name;
+
+            const safeName = selectedName.replace(/[^a-zA-Z0-9]/g, '');
+            const meta = {
+                sets: Store.state.meta[`meta_${safeName}_sets`] || ex.sets || 3,
+                reps: Store.state.meta[`meta_${safeName}_reps`] || ex.reps || "10-12",
+                rest: Store.state.meta[`meta_${safeName}_rest`] || ex.rest || "2m",
+                rpe:  Store.state.meta[`meta_${safeName}_rpe`]  || ex.rpe  || "9"
+            };
+            
+            let setsHtml = '';
+            const countKey = `${baseId}_ex${idx}_${safeName}_count`;
+            let setCount = parseInt(Store.getLog(countKey));
+            
+            // Auto-fetch number of sets based on history
+            if (isNaN(setCount)) {
+                const hist = this.findRecentLiftingSession(selectedName, this.context.week, this.context.dayKey);
+                if (hist) {
+                    const hCount = Store.getLog(`w${hist.week}_${hist.day}_ex${hist.index}_${hist.safeName}_count`);
+                    if (hCount) setCount = parseInt(hCount);
+                }
+            }
+            if (isNaN(setCount)) setCount = parseInt(meta.sets) || 3;
+
+            for (let s = 1; s <= setCount; s++) {
+                const rowId = `${baseId}_ex${idx}_${safeName}_s${s}`;
+                const wVal = Store.getLog(`${rowId}_w`), rVal = Store.getLog(`${rowId}_r`);
+                let phw = "-", phr = "-";
+                
+                // Fetch Placeholders
+                const hist = this.findHistory(selectedName, this.context.week, this.context.dayKey, s);
+                if (hist) { phw = hist.weight || "-"; phr = hist.reps || "-"; }
+                
+                setsHtml += `<div class="set-row"><span class="set-num">${s}</span><div class="set-input-group"><input type="number" class="set-input" placeholder="${phw}" value="${wVal}" oninput="Store.setLog('${rowId}_w', this.value)"><span class="input-suffix">lbs</span></div><div class="set-input-group"><input type="number" class="set-input" placeholder="${phr}" value="${rVal}" oninput="Store.setLog('${rowId}_r', this.value)"><span class="input-suffix">reps</span></div>${(s>1 && s===setCount) ? `<button class="delete-set-btn" onclick="App.removeSet(${idx}, '${safeName}', ${setCount})">×</button>` : '<span></span>'}</div>`;
+            }
+            
+            const noteKey = `${baseId}_ex${idx}_${safeName}_note`;
+            let noteVal = Store.getLog(noteKey);
+            if (!noteVal) noteVal = this.findHistoryNote(selectedName, this.context.week, this.context.dayKey);
+            
+            card.innerHTML = `<div class="exercise-header"><div class="exercise-title-area" onclick="App.openExerciseSelector(${idx})"><div class="exercise-name">${esc(selectedName)} ▾</div><div class="exercise-meta-row"><span class="meta-tag" onclick="event.stopPropagation(); App.editMeta('${safeName}', 'sets', '${meta.sets}')">${meta.sets} sets</span><span class="meta-tag" onclick="event.stopPropagation(); App.editMeta('${safeName}', 'reps', '${meta.reps}')">${meta.reps} reps</span></div></div><div class="exercise-actions"><button class="icon-btn" onclick="App.toggleNote('${noteKey}')">📝<span id="ind_${noteKey}" class="has-note-indicator ${noteVal?'show':''}">●</span></button><button class="icon-btn" onclick="App.openExerciseOptions(${idx})">⋮</button></div></div><textarea id="note_${noteKey}" class="note-area ${noteVal?'visible':''}" placeholder="Notes..." oninput="App.saveNote('${noteKey}', this.value)">${esc(noteVal||"")}</textarea><div class="sets-wrapper">${setsHtml}</div><button class="btn btn-ghost" style="margin-top:8px; font-size:0.8rem" onclick="App.addSet(${idx}, '${safeName}', ${setCount})">+ Add Set</button>`;
+            container.appendChild(card);
+        });
+    },
+
+    renderCardioExercises() {
+        const container = UI.el('exercisesList'); container.innerHTML = "";
+        const currentExercises = this.getExercises(); 
+        const baseId = `c_${this.context.dayKey}`;
+        currentExercises.forEach((ex, idx) => {
+            const card = UI.create('div', 'exercise-card card');
+            const fields = ex.fields || DATA.cardioConfig[ex.name] || DATA.cardioConfig.default;
+            let fieldsHtml = "";
+            fields.forEach(field => {
+                const key = `${baseId}_c${idx}_${field}`, val = Store.getLog(key);
+                fieldsHtml += `<div class="cardio-field"><label>${field}</label><input type="text" class="modern-input" value="${esc(val)}" placeholder="" oninput="Store.setLog('${key}', this.value)"></div>`;
+            });
+            card.innerHTML = `<div class="exercise-header"><div class="exercise-title-area" onclick="App.openExerciseSelector(${idx})"><div class="exercise-name">${esc(ex.name)} ▾</div></div><div class="exercise-actions"><button class="icon-btn" onclick="App.openExerciseOptions(${idx})">⋮</button></div></div><div class="cardio-grid">${fieldsHtml}</div>`;
+            container.appendChild(card);
+        });
+    },
+
+    openExerciseSelector(index) {
+        this.context.isAdding = false; this.context.exerciseIndex = index;
+        const list = UI.el('selectorList');
+        list.innerHTML = ""; UI.el('exerciseSearch').value = "";
+        
+        const currentEx = this.getExercises()[index];
+        const alts = currentEx.alts || [];
+        const filteredAlts = alts.filter(name => name !== "(See Guide)");
+        
+        filteredAlts.forEach(name => {
+            const li = document.createElement('li'); li.className = 'search-item'; li.textContent = name; li.dataset.name = name; list.appendChild(li);
+        });
+        if (filteredAlts.length > 0) {
+            const li = document.createElement('li'); li.className = 'search-item'; li.innerHTML = '<small style="color:var(--primary); font-weight:bold;">All Exercises...</small>'; list.appendChild(li); 
+        }
+        
+        this.filterExercises("", true); 
+        UI.openModal('selectorOverlay');
+    },
+
+    filterExercises(term, appendMode = false) {
+        const list = UI.el('selectorList');
+        if (!appendMode && (this.context.isAdding || term.length > 0)) list.innerHTML = "";
+        
+        let sourceList = (this.context.tab === 'cardio') ? 
+            [...Object.keys(DATA.cardioConfig).filter(k=>k!=='default'), ...Store.state.customExercises.cardio] : 
+            [...Array.from(MASTER_LIST).filter(k=>!DATA.cardioConfig[k]), ...Store.state.customExercises.lifting];
+        
+        sourceList = sourceList.filter(n => n !== "(See Guide)").sort();
+        let foundExact = false, lowerTerm = term.toLowerCase();
+        
+        sourceList.forEach(ex => {
+            if (ex.toLowerCase().includes(lowerTerm)) {
+                const li = document.createElement('li'); li.className = 'search-item'; li.textContent = ex; li.dataset.name = ex; list.appendChild(li);
+                if (ex.toLowerCase() === lowerTerm) foundExact = true;
+            }
+        });
+        
+        const btn = UI.el('addCustomExerciseBtn');
+        btn.style.display = foundExact ? 'none' : 'block';
+        btn.textContent = `Use "${term}"`;
+    },
+
+    addCustomExercise() {
+        const val = UI.el('exerciseSearch').value.trim();
+        if (val) this.swapExercise(val);
+    },
+
+    swapExercise(newName) {
+        const resolvedName = this.resolveExerciseName(newName);
+        this.ensureCustomExerciseSaved(resolvedName);
+        
+        if (this.context.isAdding) { 
+            this.addExerciseReal(resolvedName); UI.closeModal('selectorOverlay'); return; 
+        }
+        
+        if (this.context.tab === 'lifting') {
+            this.handleLiftingSwap(this.context.exerciseIndex, resolvedName);
+        } else {
+            const exercises = this.getExercises();
+            exercises[this.context.exerciseIndex] = { name: resolvedName, fields: [...(DATA.cardioConfig[resolvedName] || DATA.cardioConfig.default)] };
+            this.saveExercises(exercises); this.renderCardioExercises(); UI.closeModal('selectorOverlay');
+        }
+    },
+
+    ensureCustomExerciseSaved(name) {
+        let list = this.context.tab === 'cardio' ? Store.state.customExercises.cardio : Store.state.customExercises.lifting;
+        if (list.includes(name)) return;
+        let isKnown = this.context.tab === 'cardio' ? DATA.cardioConfig[name] : MASTER_LIST.has(name);
+        if (!isKnown && !list.some(x => x.toLowerCase() === name.toLowerCase())) {
+            list.push(name); Store.saveCustomExercises();
+        }
+    },
+
+    handleLiftingSwap(idx, newName) {
+        if (idx === null || idx === undefined) return; 
+        const baseId = `w${this.context.week}_${this.context.dayKey}`;
+        const oldName = Store.state.prefs[`${baseId}_ex${idx}_choice`] || this.getExercises()[idx].name;
+        
+        if (oldName === newName) { UI.closeModal('selectorOverlay'); return; }
+        
+        const oldSafe = oldName.replace(/[^a-zA-Z0-9]/g, '');
+        const hasData = Object.keys(Store.state.logs).some(k => k.startsWith(`${baseId}_ex${idx}_${oldSafe}_`));
+        
+        if (hasData) {
+            UI.closeModal('selectorOverlay');
+            this.showDataChoiceModal(oldName, newName, () => this.performLiftingSwap(idx, oldName, newName, true), () => this.performLiftingSwap(idx, oldName, newName, false));
+        } else {
+            this.performLiftingSwap(idx, oldName, newName, false); UI.closeModal('selectorOverlay');
+        }
+    },
+
+    performLiftingSwap(idx, oldName, newName, keepData) {
+        const baseId = `w${this.context.week}_${this.context.dayKey}`;
+        const oldSafe = oldName.replace(/[^a-zA-Z0-9]/g, '');
+        const newSafe = newName.replace(/[^a-zA-Z0-9]/g, '');
+        const prefix = `${baseId}_ex${idx}_${oldSafe}_`;
+        
+        Object.keys(Store.state.logs).filter(k => k.startsWith(prefix)).forEach(oldKey => {
+            if (keepData) {
+                Store.state.logs[`${baseId}_ex${idx}_${newSafe}_${oldKey.substring(prefix.length)}`] = Store.state.logs[oldKey];
+            }
+            delete Store.state.logs[oldKey];
+        });
+        
+        Store.state.prefs[`${baseId}_ex${idx}_choice`] = newName;
+        
+        // --- FORWARD PROPAGATION ---
+        // Cascade this exercise swap forward into future weeks dynamically
+        const maxWeek = (Store.state.prefs.max_cycle || 1) * 11;
+        for (let w = this.context.week + 1; w <= maxWeek; w++) {
+            const fKey = `w${w}_${this.context.dayKey}_ex${idx}_choice`;
+            
+            const templateWk = ((w - 1) % 11) + 1;
+            const blockPrefix = templateWk >= 7 ? "block2_" : "block1_";
+            
+            // Ensure the slot exists in the default workouts template
+            const dayWorkouts = DATA.workouts[blockPrefix + this.context.dayKey];
+            let futureDefault = null;
+            if (dayWorkouts && dayWorkouts[idx]) {
+                futureDefault = dayWorkouts[idx].name;
+            }
+            
+            const currentFutureChoice = Store.state.prefs[fKey] || futureDefault;
+            
+            // Only overwrite future weeks if they are still configured to use the old exercise 
+            // (This prevents overwriting deliberate block changes or other future custom edits)
+            if (currentFutureChoice === oldName) {
+                Store.state.prefs[fKey] = newName;
+            }
+        }
+        
+        Store.save('prefs'); 
+        Store.save('logs'); 
+        this.renderLiftingExercises();
+    },
+
+    showDataChoiceModal(oldName, newName, onKeep, onDelete) {
+        const overlay = UI.el('confirmOverlay'), msg = UI.el('confirmMessage'), grid = overlay.querySelector('.option-grid');
+        UI.el('confirmTitle').textContent = "Data Conflict";
+        msg.innerHTML = `Transfer data from <b>${esc(oldName)}</b> to <b>${esc(newName)}</b>?`;
+        grid.innerHTML = "";
+        
+        const keepBtn = UI.create('button', 'btn btn-success', 'Keep'); keepBtn.onclick = () => { onKeep(); UI.closeModal('confirmOverlay'); };
+        const delBtn = UI.create('button', 'btn btn-danger', 'Delete'); delBtn.onclick = () => { onDelete(); UI.closeModal('confirmOverlay'); };
+        grid.appendChild(keepBtn); grid.appendChild(delBtn); UI.openModal('confirmOverlay');
+    },
+
+    addExerciseReal(name) {
+        this.ensureCustomExerciseSaved(name);
+        let exercises = this.getExercises();
+        if (this.context.tab === 'lifting') exercises.push({ name: name, sets: 3, reps: "10-12", rpe: "9", rest: "2m" });
+        else exercises.push({ name: name, fields: [...(DATA.cardioConfig[name] || DATA.cardioConfig.default)] });
+        this.saveExercises(exercises);
+        if (this.context.tab === 'cardio') this.renderCardioExercises(); else this.renderLiftingExercises();
+        this.context.isAdding = false;
+    },
+
+    addSet(index, safeName, currentCount) {
+        Store.setLog(`w${this.context.week}_${this.context.dayKey}_ex${index}_${safeName}_count`, currentCount + 1);
+        this.renderLiftingExercises();
+    },
+
+    removeSet(index, safeName, currentCount) {
+        if (currentCount <= 1) return;
+        const setId = `w${this.context.week}_${this.context.dayKey}_ex${index}_${safeName}_s${currentCount}`;
+        delete Store.state.logs[`${setId}_w`]; delete Store.state.logs[`${setId}_r`];
+        Store.setLog(`w${this.context.week}_${this.context.dayKey}_ex${index}_${safeName}_count`, currentCount - 1);
+        this.renderLiftingExercises();
+    },
+
+    toggleNote(key) {
+        const el = UI.el(`note_${key}`); el.classList.toggle('visible'); if (el.classList.contains('visible')) el.focus();
+    },
+
+    saveNote(key, val) {
+        Store.setLog(key, val); UI.el(`ind_${key}`).classList.toggle('show', val.trim().length > 0);
+    },
+
+    editMeta(safeName, field, currentVal) {
+        this.context.metaContext = { safeName, field };
+        UI.el('valueTitle').textContent = `Edit ${field.toUpperCase()}`;
+        const grid = UI.el('valueGrid'); grid.innerHTML = "";
+        (DATA.metaSuggestions[field]||[]).forEach(opt => {
+            grid.appendChild(UI.create('button', 'option-btn', opt, { click: () => {
+                Store.state.meta[`meta_${safeName}_${field}`] = opt; Store.save('meta');
+                this.renderLiftingExercises(); UI.closeModal('valueOverlay');
+            }}));
+        });
+        UI.openModal('valueOverlay');
+    },
+
+    saveCustomValue() {
+        const val = UI.el('customValueInput').value.trim();
+        if (val) {
+            Store.state.meta[`meta_${this.context.metaContext.safeName}_${this.context.metaContext.field}`] = val;
+            Store.save('meta'); this.renderLiftingExercises(); UI.closeModal('valueOverlay');
+        }
+    },
+
+    openAddExercise() {
+        this.context.isAdding = true; this.context.exerciseIndex = null;
+        UI.el('exerciseSearch').value = ""; UI.el('selectorList').innerHTML = "";
+        this.filterExercises(""); UI.openModal('selectorOverlay');
+    },
+
+    openExerciseOptions(index) {
+        const menu = UI.el('menuOptions'); menu.innerHTML = "";
+        const delBtn = UI.create('button', 'option-btn', 'Delete Exercise');
+        delBtn.style.color = 'var(--danger)'; delBtn.style.gridColumn = "span 2";
+        delBtn.onclick = () => {
+            let exercises = this.getExercises(); exercises.splice(index, 1); this.saveExercises(exercises);
+            if (this.context.tab === 'cardio') this.renderCardioExercises(); else this.renderLiftingExercises();
+            UI.closeModal('menuOverlay');
+        };
+        menu.appendChild(delBtn); UI.el('menuTitle').textContent = "Options"; UI.openModal('menuOverlay');
+    },
+
+    finishWorkout() {
+        UI.showConfirm("Complete and Save the Workout?", () => {
+            if (this.context.tab === 'lifting') {
+                Store.state.status[`w${this.context.week}_${this.context.dayKey}`] = true;
+                Store.save('status');
+            }
+            Store.flush();
+            this.showMotivation();
+        });
+    },
+
+    showMotivation() {
+        const phrases = ["You crushed it! 💪🔥", "Beast mode: OFF. Gains: ON. 🦍📈", "Another one done! 🛡️⚔️", "Nobody can stop you 🚀🌟", "Get that PROTEIN! 🥛", "BEAST 🦍"];
+        const phrase = phrases[Math.floor(Math.random() * phrases.length)];
+        const overlay = UI.el('motivationOverlay');
+        UI.el('motivationTitle').textContent = "Workout Complete!";
+        UI.el('motivationMessage').innerHTML = `${phrase}<br><br><span style="font-size:0.9em; color:var(--text-muted)">Check your gains?</span>`;
+        UI.el('progressContent').style.display = 'none';
+        
+        const actions = UI.el('motivationActions'); actions.innerHTML = "";
+        const yesBtn = UI.create('button', 'btn btn-success', 'Show Gains 📈');
+        yesBtn.onclick = () => {
+            this.renderProgressReport(UI.el('progressContent'));
+            UI.el('progressContent').style.display = 'block';
+            UI.el('motivationMessage').innerHTML = phrase;
+            yesBtn.style.display = 'none'; noBtn.textContent = "Return to Menu"; noBtn.className = "btn btn-primary";
+        };
+        const noBtn = UI.create('button', 'btn btn-outline', 'Skip & Finish');
+        noBtn.onclick = () => { UI.closeModal('motivationOverlay'); this.goBack(); };
+        actions.appendChild(yesBtn); actions.appendChild(noBtn);
+        UI.openModal('motivationOverlay');
+    },
+
+    renderProgressReport(container) {
+        if (this.context.tab === 'cardio') { container.innerHTML = "<p style='text-align:center'>Progress tracking optimized for lifting.</p>"; return; }
+        const report = [], exercises = this.getExercises();
+        exercises.forEach((ex, idx) => {
+            const baseId = `w${this.context.week}_${this.context.dayKey}`, usedName = Store.state.prefs[`${baseId}_ex${idx}_choice`] || ex.name;
+            const prevSession = this.findRecentLiftingSession(usedName, this.context.week, this.context.dayKey);
+            if (prevSession) {
+                const changes = []; let s = 1;
+                while (true) {
+                    const safeName = usedName.replace(/[^a-zA-Z0-9]/g, '');
+                    const currW = parseFloat(Store.getLog(`${baseId}_ex${idx}_${safeName}_s${s}_w`)), currR = parseFloat(Store.getLog(`${baseId}_ex${idx}_${safeName}_s${s}_r`));
+                    if (isNaN(currW) && isNaN(currR)) break;
+                    
+                    const prevRowId = `w${prevSession.week}_${prevSession.day}_ex${prevSession.index}_${prevSession.safeName}_s${s}`;
+                    const prevW = parseFloat(Store.getLog(`${prevRowId}_w`)), prevR = parseFloat(Store.getLog(`${prevRowId}_r`));
+                    
+                    if (!isNaN(prevW) && !isNaN(prevR)) {
+                        if (currW > prevW) changes.push(`<span class="report-stat gain">+${currW - prevW} lbs (Set ${s})</span>`);
+                        else if (currW === prevW && currR > prevR) changes.push(`<span class="report-stat gain">+${currR - prevR} reps (Set ${s})</span>`);
+                        else if (currW === prevW && currR === prevR) changes.push(`<span class="report-stat maintain">Maintained (Set ${s})</span>`);
+                    }
+                    s++;
+                }
+                if (changes.length > 0) report.push({ name: usedName, stats: changes });
+            }
+        });
+        if (report.length === 0) container.innerHTML = "<p style='text-align:center; color:var(--text-muted);'>No improvements found or first time.</p>";
+        else {
+            let html = "<ul class='report-list'>";
+            report.forEach(item => { html += `<li class="report-item"><div style="font-weight:600; margin-bottom:4px;">${esc(item.name)}</div><div>${item.stats.join('')}</div></li>`; });
+            container.innerHTML = html + "</ul>";
+        }
+    },
+
+    clearProgress() {
+        UI.showConfirm("Clear progress? Cannot be undone.", () => {
+            const prefix = this.context.tab === 'lifting' ? `w${this.context.week}_${this.context.dayKey}_` : `c_${this.context.dayKey}_`;
+            Object.keys(Store.state.logs).filter(k => k.startsWith(prefix)).forEach(k => delete Store.state.logs[k]);
+            if (this.context.tab === 'lifting') delete Store.state.status[`w${this.context.week}_${this.context.dayKey}`];
+            else { delete Store.state.dynamic[`c_${this.context.dayKey}`]; Store.save('dynamic'); }
+            Store.flush(); Store.save('logs'); Store.save('status'); this.goBack();
+        });
+    },
+
+    exportData() {
+        let csv = "Key,Value\n";
+        for (const [k, v] of Object.entries(Store.state.logs)) csv += `${k},"${String(v).replace(/"/g, '""')}"\n`;
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        const a = document.createElement('a'); a.href = url; a.download = `pure_bb_data.csv`;
+        document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+};
+
+window.addEventListener('pagehide', () => Store.flush());
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') Store.flush(); });
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+
+window.App = App;
+window.Store = Store;
+window.UI = UI;
+
+App.init();
+</script>
+</body>
+</html>
